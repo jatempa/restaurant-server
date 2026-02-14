@@ -14,30 +14,48 @@ datasource db {
 }
 
 model User {
-  id              Int     @id @default(autoincrement()) @map("user_id")
-  name            String  @db.VarChar(60)
-  firstLastName   String  @db.VarChar(60)
-  secondLastName  String? @db.VarChar(60)
-  cellphoneNumber String  @db.VarChar(30)
-
-  // FOSUserBundle fields (assuming standard fields from the bundle)
-  username            String    @unique @db.VarChar(180)
-  usernameCanonical   String    @unique @map("username_canonical") @db.VarChar(180)
-  email               String    @unique @db.VarChar(180)
-  emailCanonical      String    @unique @map("email_canonical") @db.VarChar(180)
-  enabled             Boolean   @default(false)
-  salt                String?   @db.VarChar(255)
-  password            String    @db.VarChar(255)
-  lastLogin           DateTime? @map("last_login")
-  confirmationToken   String?   @map("confirmation_token") @db.VarChar(180)
-  passwordRequestedAt DateTime? @map("password_requested_at")
-  roles               String    @db.Text // Store as JSON string
+  id              Int       @id @default(autoincrement()) @map("user_id")
+  email           String    @unique @db.VarChar(180)
+  username        String    @unique @db.VarChar(180)
+  password        String    @db.VarChar(255)
+  name            String    @db.VarChar(60)
+  firstLastName   String    @db.VarChar(60)
+  secondLastName  String?   @db.VarChar(60)
+  cellphoneNumber String    @db.VarChar(30)
+  enabled         Boolean   @default(true)
+  lastLogin       DateTime? @map("last_login")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  accounts Account[]
-  notes    Note[]
+  accounts  Account[]
+  notes     Note[]
+  userRoles UserRole[]
 
   @@map("users")
+}
+
+model Role {
+  id        Int    @id @default(autoincrement()) @map("role_id")
+  name      String @unique @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  userRoles UserRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  userId Int @map("user_id")
+  roleId Int @map("role_id")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
 }
 
 model Account {
