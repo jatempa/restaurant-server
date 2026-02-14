@@ -1,5 +1,19 @@
 import { prisma } from '../lib/db.js';
 
+export interface CreateProductData {
+  name: string;
+  price: number;
+  stock: number;
+  categoryId: number;
+}
+
+export interface UpdateProductData {
+  name?: string;
+  price?: number;
+  stock?: number;
+  categoryId?: number;
+}
+
 export async function findAll() {
   return prisma.product.findMany({
     include: { category: true },
@@ -11,5 +25,36 @@ export async function findById(id: number) {
   return prisma.product.findUnique({
     where: { id },
     include: { category: true },
+  });
+}
+
+export async function create(data: CreateProductData) {
+  return prisma.product.create({
+    data: {
+      name: data.name,
+      price: data.price,
+      stock: data.stock,
+      categoryId: data.categoryId,
+    },
+    include: { category: true },
+  });
+}
+
+export async function update(id: number, data: UpdateProductData) {
+  return prisma.product.update({
+    where: { id },
+    data: {
+      ...(data.name !== undefined && { name: data.name }),
+      ...(data.price !== undefined && { price: data.price }),
+      ...(data.stock !== undefined && { stock: data.stock }),
+      ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
+    },
+    include: { category: true },
+  });
+}
+
+export async function remove(id: number) {
+  return prisma.product.delete({
+    where: { id },
   });
 }
