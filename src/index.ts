@@ -1,9 +1,14 @@
+import 'dotenv/config';
 import express from 'express';
 import type { Request, Response } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import { PrismaClient } from '../generated/prisma/client.js';
+import { PrismaPg } from '@prisma/adapter-pg';
 
-dotenv.config();
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL,
+});
+const prisma = new PrismaClient({ adapter });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,104 +17,160 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// In-memory data store for testing
-interface Item {
-  id: number;
-  name: string;
-  description: string;
+// User fields exposed in API (excludes password, username, etc.)
+const userSelect = {
+  id: true,
+  email: true,
+  name: true,
+  firstLastName: true,
+} as const;
+
+// Parse id param helper
+function parseId(idParam: string | string[] | undefined): number | null {
+  const str = typeof idParam === 'string' ? idParam : undefined;
+  if (!str) return null;
+  const id = parseInt(str, 10);
+  return Number.isNaN(id) ? null : id;
 }
 
-let items: Item[] = [
-  { id: 1, name: 'Item 1', description: 'First test item' },
-  { id: 2, name: 'Item 2', description: 'Second test item' },
-];
-
-let nextId = 3;
-
-// GET all items
-app.get('/api/items', (_req: Request, res: Response) => {
-  res.json(items);
+// ─── Accounts ─────────────────────────────────────────────────────────────
+app.get('/api/accounts', async (_req: Request, res: Response) => {
+  try {
+    const accounts = await prisma.account.findMany({
+      include: { user: { select: userSelect } },
+      orderBy: { id: 'asc' },
+    });
+    res.json(accounts);
+  } catch (error) {
+    console.error('Error fetching accounts:', error);
+    res.status(500).json({ message: 'Failed to fetch accounts' });
+  }
 });
 
-// GET single item by id
-app.get('/api/items/:id', (req: Request, res: Response) => {
-  const idParam = req.params.id;
-  const id = typeof idParam === 'string' ? parseInt(idParam) : NaN;
-  const item = items.find((i) => i.id === id);
+app.get('/api/accounts/:id', async (req: Request, res: Response) => {
+  const id = parseId(req.params.id);
+  if (id === null) return res.status(400).json({ message: 'Invalid account id' });
 
-  if (!item) {
-    return res.status(404).json({ message: 'Item not found' });
+  try {
+    const account = await prisma.account.findUnique({
+      where: { id },
+      include: { user: { select: userSelect }, notes: true },
+    });
+    if (!account) return res.status(404).json({ message: 'Account not found' });
+    res.json(account);
+  } catch (error) {
+    console.error('Error fetching account:', error);
+    res.status(500).json({ message: 'Failed to fetch account' });
   }
-
-  res.json(item);
 });
 
-// POST create new item
-app.post('/api/items', (req: Request, res: Response) => {
-  const { name, description } = req.body;
-
-  if (!name || !description) {
-    return res
-      .status(400)
-      .json({ message: 'Name and description are required' });
+// ─── Categories ────────────────────────────────────────────────────────────
+app.get('/api/categories', async (_req: Request, res: Response) => {
+  try {
+    const categories = await prisma.category.findMany({
+      include: { products: true },
+      orderBy: { id: 'asc' },
+    });
+    res.json(categories);
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    res.status(500).json({ message: 'Failed to fetch categories' });
   }
-
-  const newItem: Item = { id: nextId++, name, description };
-  items.push(newItem);
-
-  res.status(201).json(newItem);
 });
 
-// PUT update item
-app.put('/api/items/:id', (req: Request, res: Response) => {
-  const idParam = req.params.id;
-  const id = typeof idParam === 'string' ? parseInt(idParam) : NaN;
+app.get('/api/categories/:id', async (req: Request, res: Response) => {
+  const id = parseId(req.params.id);
+  if (id === null) return res.status(400).json({ message: 'Invalid category id' });
 
-  if (isNaN(id)) {
-    return res.status(400).json({ message: 'Invalid item id' });
+  try {
+    const category = await prisma.category.findUnique({
+      where: { id },
+      include: { products: true },
+    });
+    if (!category) return res.status(404).json({ message: 'Category not found' });
+    res.json(category);
+  } catch (error) {
+    console.error('Error fetching category:', error);
+    res.status(500).json({ message: 'Failed to fetch category' });
   }
-
-  const index = items.findIndex((i) => i.id === id);
-
-  if (index === -1) {
-    return res.status(404).json({ message: 'Item not found' });
-  }
-
-  const { name, description } = req.body;
-
-  if (!name || !description) {
-    return res
-      .status(400)
-      .json({ message: 'Name and description are required' });
-  }
-
-  // Ensure the updated object includes the required 'id' property (to satisfy Item type)
-  items[index] = { id: items[index]!.id, name, description };
-
-  res.json(items[index]);
 });
 
-// DELETE item
-app.delete('/api/items/:id', (req: Request, res: Response) => {
-  const idParam = req.params.id;
-  const id = typeof idParam === 'string' ? parseInt(idParam) : NaN;
-
-  if (isNaN(id)) {
-    return res.status(400).json({ message: 'Invalid item id' });
+// ─── Products ──────────────────────────────────────────────────────────────
+app.get('/api/products', async (_req: Request, res: Response) => {
+  try {
+    const products = await prisma.product.findMany({
+      include: { category: true },
+      orderBy: { id: 'asc' },
+    });
+    res.json(products);
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    res.status(500).json({ message: 'Failed to fetch products' });
   }
+});
 
-  const index = items.findIndex((i) => i.id === id);
+app.get('/api/products/:id', async (req: Request, res: Response) => {
+  const id = parseId(req.params.id);
+  if (id === null) return res.status(400).json({ message: 'Invalid product id' });
 
-  if (index === -1) {
-    return res.status(404).json({ message: 'Item not found' });
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: { category: true },
+    });
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+    res.json(product);
+  } catch (error) {
+    console.error('Error fetching product:', error);
+    res.status(500).json({ message: 'Failed to fetch product' });
   }
+});
 
-  const deleted = items.splice(index, 1);
+// ─── Notes (with products) ──────────────────────────────────────────────────
+app.get('/api/notes', async (_req: Request, res: Response) => {
+  try {
+    const notes = await prisma.note.findMany({
+      include: {
+        user: { select: userSelect },
+        account: true,
+        noteProducts: { include: { product: true } },
+      },
+      orderBy: { id: 'asc' },
+    });
+    res.json(notes);
+  } catch (error) {
+    console.error('Error fetching notes:', error);
+    res.status(500).json({ message: 'Failed to fetch notes' });
+  }
+});
 
-  res.json({ message: 'Item deleted', item: deleted[0] });
+app.get('/api/notes/:id', async (req: Request, res: Response) => {
+  const id = parseId(req.params.id);
+  if (id === null) return res.status(400).json({ message: 'Invalid note id' });
+
+  try {
+    const note = await prisma.note.findUnique({
+      where: { id },
+      include: {
+        user: { select: userSelect },
+        account: true,
+        noteProducts: { include: { product: true } },
+      },
+    });
+    if (!note) return res.status(404).json({ message: 'Note not found' });
+    res.json(note);
+  } catch (error) {
+    console.error('Error fetching note:', error);
+    res.status(500).json({ message: 'Failed to fetch note' });
+  }
 });
 
 // Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+});
+
+process.on('SIGTERM', async () => {
+  server.close();
+  await prisma.$disconnect();
 });
