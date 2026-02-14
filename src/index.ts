@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { prisma } from './lib/db.js';
+import { errorHandler } from './middleware/errorHandler.js';
 import accountsRoutes from './routes/accounts.js';
 import categoriesRoutes from './routes/categories.js';
 import productsRoutes from './routes/products.js';
@@ -18,6 +19,9 @@ app.use('/api/accounts', accountsRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/products', productsRoutes);
 app.use('/api/notes', notesRoutes);
+
+// Error handler (must be last)
+app.use(errorHandler);
 
 // Start server
 const server = app.listen(PORT, () => {

@@ -1,36 +1,33 @@
 import { Router, type Request, type Response } from 'express';
-import { prisma, parseId } from '../lib/db.js';
+import { parseId } from '../lib/db.js';
+import { asyncHandler } from '../middleware/asyncHandler.js';
+import * as productService from '../services/product.service.js';
 
 const router = Router();
 
-router.get('/', async (_req: Request, res: Response) => {
-  try {
-    const products = await prisma.product.findMany({
-      include: { category: true },
-      orderBy: { id: 'asc' },
-    });
+router.get(
+  '/',
+  asyncHandler(async (_req: Request, res: Response) => {
+    const products = await productService.findAll();
     res.json(products);
-  } catch (error) {
-    console.error('Error fetching products:', error);
-    res.status(500).json({ message: 'Failed to fetch products' });
-  }
-});
+  })
+);
 
-router.get('/:id', async (req: Request, res: Response) => {
-  const id = parseId(req.params.id);
-  if (id === null) return res.status(400).json({ message: 'Invalid product id' });
-
-  try {
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: { category: true },
-    });
-    if (!product) return res.status(404).json({ message: 'Product not found' });
+router.get(
+  '/:id',
+  asyncHandler(async (req: Request, res: Response) => {
+    const id = parseId(req.params.id);
+    if (id === null) {
+      res.status(400).json({ message: 'Invalid product id' });
+      return;
+    }
+    const product = await productService.findById(id);
+    if (!product) {
+      res.status(404).json({ message: 'Product not found' });
+      return;
+    }
     res.json(product);
-  } catch (error) {
-    console.error('Error fetching product:', error);
-    res.status(500).json({ message: 'Failed to fetch product' });
-  }
-});
+  })
+);
 
 export default router;
