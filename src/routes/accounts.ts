@@ -1,33 +1,10 @@
-import { Router, type Request, type Response } from 'express';
-import { parseId } from '../lib/db.js';
+import { Router } from 'express';
 import { asyncHandler } from '../middleware/asyncHandler.js';
-import * as accountService from '../services/account.service.js';
+import * as accountController from '../controllers/account.controller.js';
 
 const router = Router();
 
-router.get(
-  '/',
-  asyncHandler(async (_req: Request, res: Response) => {
-    const accounts = await accountService.findAll();
-    res.json(accounts);
-  })
-);
-
-router.get(
-  '/:id',
-  asyncHandler(async (req: Request, res: Response) => {
-    const id = parseId(req.params.id);
-    if (id === null) {
-      res.status(400).json({ message: 'Invalid account id' });
-      return;
-    }
-    const account = await accountService.findById(id);
-    if (!account) {
-      res.status(404).json({ message: 'Account not found' });
-      return;
-    }
-    res.json(account);
-  })
-);
+router.get('/', asyncHandler(accountController.getAll));
+router.get('/:id', asyncHandler(accountController.getById));
 
 export default router;
