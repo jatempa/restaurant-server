@@ -13,3 +13,98 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id              Int     @id @default(autoincrement()) @map("user_id")
+  name            String  @db.VarChar(60)
+  firstLastName   String  @db.VarChar(60)
+  secondLastName  String? @db.VarChar(60)
+  cellphoneNumber String  @db.VarChar(30)
+
+  // FOSUserBundle fields (assuming standard fields from the bundle)
+  username            String    @unique @db.VarChar(180)
+  usernameCanonical   String    @unique @map("username_canonical") @db.VarChar(180)
+  email               String    @unique @db.VarChar(180)
+  emailCanonical      String    @unique @map("email_canonical") @db.VarChar(180)
+  enabled             Boolean   @default(false)
+  salt                String?   @db.VarChar(255)
+  password            String    @db.VarChar(255)
+  lastLogin           DateTime? @map("last_login")
+  confirmationToken   String?   @map("confirmation_token") @db.VarChar(180)
+  passwordRequestedAt DateTime? @map("password_requested_at")
+  roles               String    @db.Text // Store as JSON string
+
+  // Relations
+  accounts Account[]
+  notes    Note[]
+
+  @@map("users")
+}
+
+model Account {
+  id       Int       @id @default(autoincrement()) @map("account_id")
+  userId   Int       @map("user")
+  name     String?   @db.VarChar(20)
+  checkin  DateTime?
+  checkout DateTime?
+
+  // Relations
+  user  User   @relation(fields: [userId], references: [id])
+  notes Note[]
+
+  @@map("accounts")
+}
+
+model Category {
+  id   Int    @id @default(autoincrement()) @map("category_id")
+  name String @db.VarChar(50)
+
+  // Relations
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id         Int    @id @default(autoincrement()) @map("product_id")
+  name       String @db.VarChar(85)
+  price      Float
+  stock      Int
+  categoryId Int    @map("category")
+
+  // Relations
+  category     Category      @relation(fields: [categoryId], references: [id])
+  noteProducts NoteProduct[]
+
+  @@map("products")
+}
+
+model Note {
+  id         Int       @id @default(autoincrement()) @map("note_id")
+  userId     Int       @map("user")
+  accountId  Int       @map("account")
+  numberNote Int
+  status     String    @db.VarChar(30)
+  checkin    DateTime?
+  checkout   DateTime?
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id])
+  account      Account       @relation(fields: [accountId], references: [id])
+  noteProducts NoteProduct[]
+
+  @@map("notes")
+}
+
+model NoteProduct {
+  id        Int    @id @default(autoincrement())
+  noteId    Int    @map("note")
+  productId Int    @map("product")
+  amount    Int
+  total     Float? @default(0) @db.DoublePrecision
+
+  // Relations
+  note    Note    @relation(fields: [noteId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("note_product")
+}
