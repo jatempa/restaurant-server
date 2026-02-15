@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { parseId } from '../lib/db.js';
 import * as accountService from '../services/account.service.js';
+import * as noteService from '../services/note.service.js';
 
 export async function getAll(req: Request, res: Response) {
   const userId = req.user?.sub;
@@ -26,10 +27,6 @@ export async function getById(req: Request, res: Response) {
   const account = await accountService.findById(id);
   if (!account || account.userId !== userId) {
     res.status(404).json({ message: 'Account not found' });
-    return;
-  }
-  if (account.checkout) {
-    res.status(404).json({ message: 'Account is closed' });
     return;
   }
   res.json(account);
@@ -72,6 +69,10 @@ export async function update(req: Request, res: Response) {
     return;
   }
   const { name, checkin, checkout } = req.body;
+  if (checkout !== undefined && checkout !== null) {
+    const checkoutDate = new Date(checkout);
+    await noteService.closeAllByAccountId(id, checkoutDate);
+  }
   const account = await accountService.update(id, {
     ...(name !== undefined && { name }),
     ...(checkin !== undefined && { checkin: checkin ? new Date(checkin) : null }),

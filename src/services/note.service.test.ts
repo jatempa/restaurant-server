@@ -9,6 +9,7 @@ vi.mock('../lib/db.js', () => ({
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       delete: vi.fn(),
     },
   },
@@ -132,6 +133,20 @@ describe('NoteService', () => {
 
       expect(noteProductService.deleteByNoteId).toHaveBeenCalledWith(1);
       expect(prisma.note.delete).toHaveBeenCalledWith({ where: { id: 1 } });
+    });
+  });
+
+  describe('closeAllByAccountId', () => {
+    it('closes all open notes for account', async () => {
+      const checkoutDate = new Date('2026-02-14T18:00:00');
+      vi.mocked(prisma.note.updateMany).mockResolvedValue({ count: 3 });
+
+      await noteService.closeAllByAccountId(1, checkoutDate);
+
+      expect(prisma.note.updateMany).toHaveBeenCalledWith({
+        where: { accountId: 1, checkout: null },
+        data: { checkout: checkoutDate, status: 'closed' },
+      });
     });
   });
 });

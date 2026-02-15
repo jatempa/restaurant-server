@@ -101,3 +101,10 @@ export async function remove(id: number) {
     where: { id },
   });
 }
+
+export async function closeAllByAccountId(accountId: number, checkoutDate: Date) {
+  return prisma.note.updateMany({
+    where: { accountId, checkout: null },
+    data: { checkout: checkoutDate, status: 'closed' },
+  });
+}

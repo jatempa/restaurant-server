@@ -14,9 +14,13 @@ vi.mock('../services/account.service.js', () => ({
   update: vi.fn(),
   remove: vi.fn(),
 }));
+vi.mock('../services/note.service.js', () => ({
+  closeAllByAccountId: vi.fn(),
+}));
 
 import { parseId } from '../lib/db.js';
 import * as accountService from '../services/account.service.js';
+import * as noteService from '../services/note.service.js';
 
 describe('AccountController', () => {
   beforeEach(() => {
@@ -224,6 +228,39 @@ describe('AccountController', () => {
       await accountController.update(req, res);
 
       expect(accountService.update).toHaveBeenCalledWith(1, expect.objectContaining({ name: 'Mesa 2' }));
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('closes all notes when account is checked out', async () => {
+      const mockFindById = {
+        id: 1,
+        userId: 1,
+        name: 'Mesa 1',
+        checkin: null,
+        checkout: null,
+        user: { id: 1, name: 'User', email: 'user@example.com', firstLastName: 'User' },
+        notes: [],
+      };
+      const mockUpdated = {
+        ...mockFindById,
+        checkout: new Date('2026-02-14T18:00:00'),
+      };
+      vi.mocked(parseId).mockReturnValue(1);
+      vi.mocked(accountService.findById).mockResolvedValue(mockFindById);
+      vi.mocked(accountService.update).mockResolvedValue(mockUpdated);
+
+      const checkoutDate = '2026-02-14T18:00:00.000Z';
+      const req = createMockRequest({
+        params: { id: '1' },
+        body: { checkout: checkoutDate },
+        user: { sub: 1, email: 'user@example.com' },
+      });
+      const res = createMockResponse();
+
+      await accountController.update(req, res);
+
+      expect(noteService.closeAllByAccountId).toHaveBeenCalledWith(1, expect.any(Date));
+      expect(accountService.update).toHaveBeenCalledWith(1, expect.objectContaining({ checkout: expect.any(Date) }));
       expect(res.statusCode).toBe(200);
     });
   });

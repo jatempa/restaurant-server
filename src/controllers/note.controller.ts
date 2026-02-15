@@ -50,10 +50,6 @@ export async function getById(req: Request, res: Response) {
     res.status(404).json({ message: 'Note not found' });
     return;
   }
-  if (note.checkout || account.checkout) {
-    res.status(404).json({ message: 'Note is closed' });
-    return;
-  }
   res.json(note);
 }
 
