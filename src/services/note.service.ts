@@ -29,6 +29,23 @@ export async function findAll() {
   });
 }
 
+export async function findByAccountId(accountId: number) {
+  return prisma.note.findMany({
+    where: { accountId },
+    include: {
+      user: { select: userSelect },
+      account: true,
+      noteProducts: { include: { product: true } },
+    },
+    orderBy: { id: 'asc' },
+  });
+}
+
+export async function getNextNumberForAccount(accountId: number): Promise<number> {
+  const count = await prisma.note.count({ where: { accountId } });
+  return count + 1;
+}
+
 export async function findById(id: number) {
   return prisma.note.findUnique({
     where: { id },

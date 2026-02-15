@@ -1,8 +1,30 @@
 import type { Request, Response } from 'express';
 import { parseId } from '../lib/db.js';
+import * as accountService from '../services/account.service.js';
 import * as noteService from '../services/note.service.js';
 
-export async function getAll(_req: Request, res: Response) {
+export async function getAll(req: Request, res: Response) {
+  const accountIdParam = req.query.accountId;
+  if (accountIdParam !== undefined && accountIdParam !== '') {
+    const userId = req.user?.sub;
+    if (!userId) {
+      res.status(401).json({ message: 'Authentication required' });
+      return;
+    }
+    const accountId = Number(accountIdParam);
+    if (Number.isNaN(accountId)) {
+      res.status(400).json({ message: 'Invalid accountId' });
+      return;
+    }
+    const account = await accountService.findById(accountId);
+    if (!account || account.userId !== userId) {
+      res.status(404).json({ message: 'Account not found' });
+      return;
+    }
+    const notes = await noteService.findByAccountId(accountId);
+    res.json(notes);
+    return;
+  }
   const notes = await noteService.findAll();
   res.json(notes);
 }
@@ -22,29 +44,29 @@ export async function getById(req: Request, res: Response) {
 }
 
 export async function create(req: Request, res: Response) {
-  const { userId, accountId, numberNote, status, checkin, checkout } = req.body;
-  if (userId === undefined || userId === null) {
-    res.status(400).json({ message: 'userId is required' });
+  const userId = req.user?.sub;
+  if (!userId) {
+    res.status(401).json({ message: 'Authentication required' });
     return;
   }
+  const { accountId, status, checkout } = req.body;
   if (accountId === undefined || accountId === null) {
     res.status(400).json({ message: 'accountId is required' });
     return;
   }
-  if (numberNote === undefined || numberNote === null) {
-    res.status(400).json({ message: 'numberNote is required' });
+  const accountIdNum = Number(accountId);
+  const account = await accountService.findById(accountIdNum);
+  if (!account || account.userId !== userId) {
+    res.status(404).json({ message: 'Account not found' });
     return;
   }
-  if (!status || typeof status !== 'string') {
-    res.status(400).json({ message: 'status is required' });
-    return;
-  }
+  const numberNote = await noteService.getNextNumberForAccount(accountIdNum);
   const note = await noteService.create({
-    userId: Number(userId),
-    accountId: Number(accountId),
-    numberNote: Number(numberNote),
-    status,
-    ...(checkin && { checkin: new Date(checkin) }),
+    userId,
+    accountId: accountIdNum,
+    numberNote,
+    status: status && typeof status === 'string' ? status : 'open',
+    checkin: new Date(),
     ...(checkout && { checkout: new Date(checkout) }),
   });
   res.status(201).json(note);
@@ -74,6 +96,11 @@ export async function update(req: Request, res: Response) {
 }
 
 export async function remove(req: Request, res: Response) {
+  const userId = req.user?.sub;
+  if (!userId) {
+    res.status(401).json({ message: 'Authentication required' });
+    return;
+  }
   const id = parseId(req.params.id);
   if (id === null) {
     res.status(400).json({ message: 'Invalid note id' });
@@ -81,6 +108,11 @@ export async function remove(req: Request, res: Response) {
   }
   const existing = await noteService.findById(id);
   if (!existing) {
+    res.status(404).json({ message: 'Note not found' });
+    return;
+  }
+  const account = await accountService.findById(existing.accountId);
+  if (!account || account.userId !== userId) {
     res.status(404).json({ message: 'Note not found' });
     return;
   }

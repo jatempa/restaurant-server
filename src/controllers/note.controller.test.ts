@@ -3,8 +3,13 @@ import * as noteController from './note.controller.js';
 import { createMockRequest, createMockResponse } from '../test/utils.js';
 
 vi.mock('../lib/db.js', () => ({ parseId: vi.fn() }));
+vi.mock('../services/account.service.js', () => ({
+  findById: vi.fn(),
+}));
 vi.mock('../services/note.service.js', () => ({
   findAll: vi.fn(),
+  findByAccountId: vi.fn(),
+  getNextNumberForAccount: vi.fn(),
   findById: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
@@ -12,6 +17,7 @@ vi.mock('../services/note.service.js', () => ({
 }));
 
 import { parseId } from '../lib/db.js';
+import * as accountService from '../services/account.service.js';
 import * as noteService from '../services/note.service.js';
 
 describe('NoteController', () => {
@@ -60,42 +66,54 @@ describe('NoteController', () => {
   });
 
   describe('create', () => {
-    it('returns 400 when userId is missing', async () => {
+    it('returns 401 when unauthenticated', async () => {
       const res = createMockResponse();
       await noteController.create(
-        createMockRequest({ body: { accountId: 1, numberNote: 1001, status: 'pending' } }),
+        createMockRequest({ body: { accountId: 1 } }),
         res
       );
-      expect(res.statusCode).toBe(400);
+      expect(res.statusCode).toBe(401);
     });
 
-    it('returns 400 when status is missing', async () => {
+    it('returns 400 when accountId is missing', async () => {
       const res = createMockResponse();
       await noteController.create(
-        createMockRequest({ body: { userId: 1, accountId: 1, numberNote: 1001 } }),
+        createMockRequest({ body: {}, user: { sub: 1, email: 'u@x.com' } }),
         res
       );
       expect(res.statusCode).toBe(400);
     });
 
     it('creates note and returns 201', async () => {
+      const mockAccount = {
+        id: 1,
+        userId: 1,
+        name: 'Mesa 1',
+        checkin: null,
+        checkout: null,
+        user: { id: 1, name: 'User', email: 'user@example.com', firstLastName: 'User' },
+        notes: [],
+      };
       const mockCreated = {
         id: 1,
         userId: 1,
         accountId: 1,
-        numberNote: 1001,
-        status: 'pending',
+        numberNote: 1,
+        status: 'open',
         checkin: null,
         checkout: null,
         user: { id: 1, name: 'User', email: 'user@example.com', firstLastName: 'User' },
-        account: { id: 1, userId: 1, name: 'Mesa 1', checkin: null, checkout: null },
+        account: mockAccount,
         noteProducts: [],
       };
+      vi.mocked(accountService.findById).mockResolvedValue(mockAccount);
+      vi.mocked(noteService.getNextNumberForAccount).mockResolvedValue(1);
       vi.mocked(noteService.create).mockResolvedValue(mockCreated);
       const res = createMockResponse();
       await noteController.create(
         createMockRequest({
-          body: { userId: 1, accountId: 1, numberNote: 1001, status: 'pending' },
+          body: { accountId: 1 },
+          user: { sub: 1, email: 'u@x.com' },
         }),
         res
       );
@@ -103,8 +121,8 @@ describe('NoteController', () => {
         expect.objectContaining({
           userId: 1,
           accountId: 1,
-          numberNote: 1001,
-          status: 'pending',
+          numberNote: 1,
+          status: 'open',
         })
       );
       expect(res.statusCode).toBe(201);
@@ -125,6 +143,26 @@ describe('NoteController', () => {
   });
 
   describe('remove', () => {
+    it('returns 401 when unauthenticated', async () => {
+      const mockNote = {
+        id: 1,
+        accountId: 1,
+        userId: 1,
+        numberNote: 1,
+        status: 'open',
+        checkin: null,
+        checkout: null,
+        user: { id: 1, name: 'User', email: 'user@example.com', firstLastName: 'User' },
+        account: { id: 1, userId: 1, name: 'Mesa 1', checkin: null, checkout: null },
+        noteProducts: [],
+      };
+      vi.mocked(parseId).mockReturnValue(1);
+      vi.mocked(noteService.findById).mockResolvedValue(mockNote);
+      const res = createMockResponse();
+      await noteController.remove(createMockRequest({ params: { id: '1' } }), res);
+      expect(res.statusCode).toBe(401);
+    });
+
     it('deletes and returns 204', async () => {
       const mockNote = {
         id: 1,
@@ -140,8 +178,20 @@ describe('NoteController', () => {
       };
       vi.mocked(parseId).mockReturnValue(1);
       vi.mocked(noteService.findById).mockResolvedValue(mockNote);
+      vi.mocked(accountService.findById).mockResolvedValue({
+        id: 1,
+        userId: 1,
+        name: 'Mesa 1',
+        checkin: null,
+        checkout: null,
+        user: { id: 1, name: 'User', email: 'user@example.com', firstLastName: 'User' },
+        notes: [],
+      });
       const res = createMockResponse();
-      await noteController.remove(createMockRequest({ params: { id: '1' } }), res);
+      await noteController.remove(
+        createMockRequest({ params: { id: '1' }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
       expect(noteService.remove).toHaveBeenCalledWith(1);
       expect(res.statusCode).toBe(204);
     });
