@@ -155,6 +155,56 @@ describe('NoteService', () => {
     });
   });
 
+  describe('reduceStockForNote', () => {
+    it('reduces stock for each product in note', async () => {
+      vi.mocked(prisma.note.findUnique).mockResolvedValue({
+        id: 1,
+        noteProducts: [
+          { productId: 10, amount: 2 },
+          { productId: 20, amount: 1 },
+        ],
+      } as never);
+
+      await noteService.reduceStockForNote(1);
+
+      expect(productService.reduceStock).toHaveBeenCalledWith(10, 2);
+      expect(productService.reduceStock).toHaveBeenCalledWith(20, 1);
+    });
+
+    it('aggregates amounts when same product appears multiple times', async () => {
+      vi.mocked(prisma.note.findUnique).mockResolvedValue({
+        id: 1,
+        noteProducts: [
+          { productId: 10, amount: 2 },
+          { productId: 10, amount: 3 },
+        ],
+      } as never);
+
+      await noteService.reduceStockForNote(1);
+
+      expect(productService.reduceStock).toHaveBeenCalledWith(10, 5);
+    });
+
+    it('does nothing when note not found', async () => {
+      vi.mocked(prisma.note.findUnique).mockResolvedValue(null);
+
+      await noteService.reduceStockForNote(999);
+
+      expect(productService.reduceStock).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when note has no products', async () => {
+      vi.mocked(prisma.note.findUnique).mockResolvedValue({
+        id: 1,
+        noteProducts: [],
+      } as never);
+
+      await noteService.reduceStockForNote(1);
+
+      expect(productService.reduceStock).not.toHaveBeenCalled();
+    });
+  });
+
   describe('closeAllByAccountId', () => {
     it('reduces stock for each note then closes all open notes for account', async () => {
       const checkoutDate = new Date('2026-02-14T18:00:00');

@@ -84,6 +84,15 @@ describe('ProductController', () => {
       expect(res.statusCode).toBe(400);
     });
 
+    it('returns 400 when stock is missing', async () => {
+      const res = createMockResponse();
+      await productController.create(
+        createMockRequest({ body: { name: 'Cola', price: 25, categoryId: 1 } }),
+        res
+      );
+      expect(res.statusCode).toBe(400);
+    });
+
     it('creates product and returns 201', async () => {
       const mockCreated = {
         id: 1,
@@ -121,6 +130,35 @@ describe('ProductController', () => {
         res
       );
       expect(res.statusCode).toBe(404);
+    });
+
+    it('updates product stock and returns 200', async () => {
+      vi.mocked(parseId).mockReturnValue(1);
+      vi.mocked(productService.findById).mockResolvedValue({
+        id: 1,
+        name: 'Cola',
+        price: 25,
+        stock: 100,
+        categoryId: 1,
+        category: { id: 1, name: 'Bebidas' },
+      });
+      const mockUpdated = {
+        id: 1,
+        name: 'Cola',
+        price: 25,
+        stock: 75,
+        categoryId: 1,
+        category: { id: 1, name: 'Bebidas' },
+      };
+      vi.mocked(productService.update).mockResolvedValue(mockUpdated);
+      const res = createMockResponse();
+      await productController.update(
+        createMockRequest({ params: { id: '1' }, body: { stock: 75 } }),
+        res
+      );
+      expect(productService.update).toHaveBeenCalledWith(1, { stock: 75 });
+      expect(res.statusCode).toBe(200);
+      expect((res as { _jsonData?: unknown })._jsonData).toEqual(mockUpdated);
     });
   });
 

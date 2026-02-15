@@ -90,7 +90,7 @@ describe('CategoryService', () => {
 
   describe('remove', () => {
     it('deletes category by id', async () => {
-      vi.mocked(prisma.category.delete).mockResolvedValue({ id: 1 });
+      vi.mocked(prisma.category.delete).mockResolvedValue({ id: 1 } as never);
 
       await categoryService.remove(1);
 

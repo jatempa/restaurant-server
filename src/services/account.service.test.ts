@@ -147,7 +147,7 @@ describe('AccountService', () => {
 
   describe('remove', () => {
     it('deletes notes and note products first then account', async () => {
-      vi.mocked(prisma.note.findMany).mockResolvedValue([{ id: 10 }, { id: 11 }]);
+      vi.mocked(prisma.note.findMany).mockResolvedValue([{ id: 10 }, { id: 11 }] as never);
       vi.mocked(prisma.note.delete).mockResolvedValue({} as never);
       vi.mocked(prisma.account.delete).mockResolvedValue({ id: 1, userId: 1, name: null, checkin: null, checkout: null });
 

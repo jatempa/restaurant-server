@@ -110,6 +110,20 @@ describe('ProductService', () => {
       });
       expect(result).toEqual(mockUpdated);
     });
+
+    it('updates product stock only', async () => {
+      const mockUpdated = { id: 1, name: 'Cola', price: 25, stock: 50, categoryId: 1, category: { id: 1 } };
+      vi.mocked(prisma.product.update).mockResolvedValue(mockUpdated);
+
+      const result = await productService.update(1, { stock: 50 });
+
+      expect(prisma.product.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { stock: 50 },
+        include: { category: true },
+      });
+      expect(result?.stock).toBe(50);
+    });
   });
 
   describe('reduceStock', () => {
@@ -156,6 +170,21 @@ describe('ProductService', () => {
 
       expect(result).toBeNull();
       expect(prisma.product.update).not.toHaveBeenCalled();
+    });
+
+    it('reduces stock to zero when amount equals current stock', async () => {
+      const mockProduct = { id: 1, name: 'Cola', price: 25, stock: 5, categoryId: 1, category: { id: 1 } };
+      vi.mocked(prisma.product.findUnique).mockResolvedValue(mockProduct);
+      vi.mocked(prisma.product.update).mockResolvedValue({ ...mockProduct, stock: 0 });
+
+      const result = await productService.reduceStock(1, 5);
+
+      expect(prisma.product.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { stock: 0 },
+        include: { category: true },
+      });
+      expect(result?.stock).toBe(0);
     });
   });
 
