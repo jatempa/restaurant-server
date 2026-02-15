@@ -1,6 +1,9 @@
 import bcrypt from 'bcrypt';
 import { prisma } from '../lib/db.js';
 
+const DEFAULT_SIGNUP_ROLE = 'ROLE_USER';
+const ALLOWED_SIGNUP_ROLES = new Set(['ROLE_USER', 'ROLE_ADMIN']);
+
 export interface CreateUserData {
   email: string;
   username: string;
@@ -9,6 +12,7 @@ export interface CreateUserData {
   firstLastName: string;
   secondLastName?: string;
   cellphoneNumber: string;
+  role?: 'ROLE_USER' | 'ROLE_ADMIN';
 }
 
 /**
@@ -16,6 +20,8 @@ export interface CreateUserData {
  */
 export async function create(data: CreateUserData) {
   const hashedPassword = await bcrypt.hash(data.password, 10);
+  const normalizedRole = (data.role ?? DEFAULT_SIGNUP_ROLE).trim().toUpperCase();
+  const role = ALLOWED_SIGNUP_ROLES.has(normalizedRole) ? normalizedRole : DEFAULT_SIGNUP_ROLE;
   return prisma.user.create({
     data: {
       email: data.email.toLowerCase().trim(),
@@ -25,6 +31,16 @@ export async function create(data: CreateUserData) {
       firstLastName: data.firstLastName.trim(),
       secondLastName: data.secondLastName?.trim() ?? null,
       cellphoneNumber: data.cellphoneNumber.trim(),
+      userRoles: {
+        create: {
+          role: {
+            connectOrCreate: {
+              where: { name: role },
+              create: { name: role },
+            },
+          },
+        },
+      },
     },
   });
 }

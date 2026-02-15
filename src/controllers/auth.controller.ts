@@ -1,8 +1,10 @@
 import type { Request, Response } from 'express';
 import * as authService from '../services/auth.service.js';
 
+const ALLOWED_SIGNUP_ROLES = new Set(['ROLE_USER', 'ROLE_ADMIN']);
+
 export async function signUp(req: Request, res: Response) {
-  const { email, username, password, name, firstLastName, secondLastName, cellphoneNumber } =
+  const { email, username, password, name, firstLastName, secondLastName, cellphoneNumber, role } =
     req.body;
 
   const required = ['email', 'username', 'password', 'name', 'firstLastName', 'cellphoneNumber'];
@@ -14,6 +16,14 @@ export async function signUp(req: Request, res: Response) {
     return;
   }
 
+  const normalizedRole =
+    role == null || role === '' ? undefined : String(role).trim().toUpperCase();
+
+  if (normalizedRole && !ALLOWED_SIGNUP_ROLES.has(normalizedRole)) {
+    res.status(400).json({ message: 'Invalid role. Allowed values: ROLE_USER, ROLE_ADMIN' });
+    return;
+  }
+
   const result = await authService.register({
     email: String(email),
     username: String(username),
@@ -22,6 +32,7 @@ export async function signUp(req: Request, res: Response) {
     firstLastName: String(firstLastName),
     ...(secondLastName != null && secondLastName !== '' && { secondLastName: String(secondLastName) }),
     cellphoneNumber: String(cellphoneNumber),
+    ...(normalizedRole && { role: normalizedRole as 'ROLE_USER' | 'ROLE_ADMIN' }),
   });
 
   if (result === 'EMAIL_EXISTS') {
