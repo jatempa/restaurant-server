@@ -30,6 +30,11 @@ export async function getAll(req: Request, res: Response) {
 }
 
 export async function getById(req: Request, res: Response) {
+  const userId = req.user?.sub;
+  if (!userId) {
+    res.status(401).json({ message: 'Authentication required' });
+    return;
+  }
   const id = parseId(req.params.id);
   if (id === null) {
     res.status(400).json({ message: 'Invalid note id' });
@@ -38,6 +43,15 @@ export async function getById(req: Request, res: Response) {
   const note = await noteService.findById(id);
   if (!note) {
     res.status(404).json({ message: 'Note not found' });
+    return;
+  }
+  const account = await accountService.findById(note.accountId);
+  if (!account || account.userId !== userId) {
+    res.status(404).json({ message: 'Note not found' });
+    return;
+  }
+  if (note.checkout || account.checkout) {
+    res.status(404).json({ message: 'Note is closed' });
     return;
   }
   res.json(note);
@@ -60,6 +74,10 @@ export async function create(req: Request, res: Response) {
     res.status(404).json({ message: 'Account not found' });
     return;
   }
+  if (account.checkout) {
+    res.status(404).json({ message: 'Account is closed' });
+    return;
+  }
   const numberNote = await noteService.getNextNumberForAccount(accountIdNum);
   const note = await noteService.create({
     userId,
@@ -73,6 +91,11 @@ export async function create(req: Request, res: Response) {
 }
 
 export async function update(req: Request, res: Response) {
+  const userId = req.user?.sub;
+  if (!userId) {
+    res.status(401).json({ message: 'Authentication required' });
+    return;
+  }
   const id = parseId(req.params.id);
   if (id === null) {
     res.status(400).json({ message: 'Invalid note id' });
@@ -83,9 +106,18 @@ export async function update(req: Request, res: Response) {
     res.status(404).json({ message: 'Note not found' });
     return;
   }
-  const { userId, accountId, numberNote, status, checkin, checkout } = req.body;
+  const account = await accountService.findById(existing.accountId);
+  if (!account || account.userId !== userId) {
+    res.status(404).json({ message: 'Note not found' });
+    return;
+  }
+  if (existing.checkout || account.checkout) {
+    res.status(404).json({ message: 'Note is closed' });
+    return;
+  }
+  const { userId: _userId, accountId, numberNote, status, checkin, checkout } = req.body;
   const note = await noteService.update(id, {
-    ...(userId !== undefined && { userId: Number(userId) }),
+    ...(_userId !== undefined && { userId: Number(_userId) }),
     ...(accountId !== undefined && { accountId: Number(accountId) }),
     ...(numberNote !== undefined && { numberNote: Number(numberNote) }),
     ...(status !== undefined && { status }),

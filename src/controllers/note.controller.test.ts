@@ -50,9 +50,18 @@ describe('NoteController', () => {
   });
 
   describe('getById', () => {
+    it('returns 401 when unauthenticated', async () => {
+      const res = createMockResponse();
+      await noteController.getById(createMockRequest({ params: { id: '1' } }), res);
+      expect(res.statusCode).toBe(401);
+    });
+
     it('returns 400 for invalid id', async () => {
       const res = createMockResponse();
-      await noteController.getById(createMockRequest({ params: { id: 'x' } }), res);
+      await noteController.getById(
+        createMockRequest({ params: { id: 'x' }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
       expect(res.statusCode).toBe(400);
     });
 
@@ -60,7 +69,10 @@ describe('NoteController', () => {
       vi.mocked(parseId).mockReturnValue(1);
       vi.mocked(noteService.findById).mockResolvedValue(null);
       const res = createMockResponse();
-      await noteController.getById(createMockRequest({ params: { id: '1' } }), res);
+      await noteController.getById(
+        createMockRequest({ params: { id: '1' }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
       expect(res.statusCode).toBe(404);
     });
   });
@@ -130,12 +142,25 @@ describe('NoteController', () => {
   });
 
   describe('update', () => {
+    it('returns 401 when unauthenticated', async () => {
+      const res = createMockResponse();
+      await noteController.update(
+        createMockRequest({ params: { id: '1' }, body: { status: 'completed' } }),
+        res
+      );
+      expect(res.statusCode).toBe(401);
+    });
+
     it('returns 404 when not found', async () => {
       vi.mocked(parseId).mockReturnValue(1);
       vi.mocked(noteService.findById).mockResolvedValue(null);
       const res = createMockResponse();
       await noteController.update(
-        createMockRequest({ params: { id: '1' }, body: { status: 'completed' } }),
+        createMockRequest({
+          params: { id: '1' },
+          body: { status: 'completed' },
+          user: { sub: 1, email: 'u@x.com' },
+        }),
         res
       );
       expect(res.statusCode).toBe(404);

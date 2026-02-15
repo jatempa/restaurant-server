@@ -28,6 +28,10 @@ export async function getById(req: Request, res: Response) {
     res.status(404).json({ message: 'Account not found' });
     return;
   }
+  if (account.checkout) {
+    res.status(404).json({ message: 'Account is closed' });
+    return;
+  }
   res.json(account);
 }
 
@@ -61,6 +65,10 @@ export async function update(req: Request, res: Response) {
   const existing = await accountService.findById(id);
   if (!existing || existing.userId !== userId) {
     res.status(404).json({ message: 'Account not found' });
+    return;
+  }
+  if (existing.checkout) {
+    res.status(404).json({ message: 'Account is closed' });
     return;
   }
   const { name, checkin, checkout } = req.body;
