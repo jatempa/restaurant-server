@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { prisma } from '../lib/db.js';
 import * as accountService from './account.service.js';
+import * as noteProductService from './noteProduct.service.js';
 
 vi.mock('../lib/db.js', () => ({
   prisma: {
@@ -11,8 +12,15 @@ vi.mock('../lib/db.js', () => ({
       update: vi.fn(),
       delete: vi.fn(),
     },
+    note: {
+      findMany: vi.fn(),
+      delete: vi.fn(),
+    },
   },
   userSelect: { id: true, email: true, name: true, firstLastName: true },
+}));
+vi.mock('./noteProduct.service.js', () => ({
+  deleteByNoteId: vi.fn(),
 }));
 
 describe('AccountService', () => {
@@ -138,7 +146,28 @@ describe('AccountService', () => {
   });
 
   describe('remove', () => {
-    it('deletes account by id', async () => {
+    it('deletes notes and note products first then account', async () => {
+      vi.mocked(prisma.note.findMany).mockResolvedValue([{ id: 10 }, { id: 11 }]);
+      vi.mocked(prisma.note.delete).mockResolvedValue({} as never);
+      vi.mocked(prisma.account.delete).mockResolvedValue({ id: 1, userId: 1, name: null, checkin: null, checkout: null });
+
+      vi.mocked(noteProductService.deleteByNoteId).mockResolvedValue(undefined);
+
+      await accountService.remove(1);
+
+      expect(prisma.note.findMany).toHaveBeenCalledWith({
+        where: { accountId: 1 },
+        select: { id: true },
+      });
+      expect(noteProductService.deleteByNoteId).toHaveBeenCalledWith(10);
+      expect(noteProductService.deleteByNoteId).toHaveBeenCalledWith(11);
+      expect(prisma.note.delete).toHaveBeenCalledWith({ where: { id: 10 } });
+      expect(prisma.note.delete).toHaveBeenCalledWith({ where: { id: 11 } });
+      expect(prisma.account.delete).toHaveBeenCalledWith({ where: { id: 1 } });
+    });
+
+    it('deletes account with no notes', async () => {
+      vi.mocked(prisma.note.findMany).mockResolvedValue([]);
       vi.mocked(prisma.account.delete).mockResolvedValue({ id: 1, userId: 1, name: null, checkin: null, checkout: null });
 
       await accountService.remove(1);

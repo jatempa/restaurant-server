@@ -1,4 +1,5 @@
 import { prisma, userSelect } from '../lib/db.js';
+import * as noteProductService from './noteProduct.service.js';
 
 export interface CreateAccountData {
   userId: number;
@@ -60,6 +61,14 @@ export async function update(id: number, data: UpdateAccountData) {
 }
 
 export async function remove(id: number) {
+  const notes = await prisma.note.findMany({
+    where: { accountId: id },
+    select: { id: true },
+  });
+  for (const note of notes) {
+    await noteProductService.deleteByNoteId(note.id);
+    await prisma.note.delete({ where: { id: note.id } });
+  }
   return prisma.account.delete({
     where: { id },
   });
