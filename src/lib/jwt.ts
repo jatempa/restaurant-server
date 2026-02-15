@@ -1,0 +1,19 @@
+import jwt, { type SignOptions } from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+
+export interface JwtPayload {
+  sub: number;
+  email: string;
+}
+
+export function signToken(payload: JwtPayload): string {
+  return jwt.sign(payload, JWT_SECRET, {
+    expiresIn: JWT_EXPIRES_IN,
+  } as SignOptions);
+}
+
+export function verifyToken(token: string): JwtPayload {
+  return jwt.verify(token, JWT_SECRET) as unknown as JwtPayload;
+}
