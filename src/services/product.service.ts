@@ -14,8 +14,9 @@ export interface UpdateProductData {
   categoryId?: number;
 }
 
-export async function findAll() {
+export async function findAll(categoryId?: number) {
   return prisma.product.findMany({
+    where: categoryId ? { categoryId } : undefined,
     include: { category: true },
     orderBy: { id: 'asc' },
   });

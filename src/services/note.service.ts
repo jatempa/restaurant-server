@@ -1,4 +1,5 @@
 import { prisma, userSelect } from '../lib/db.js';
+import * as noteProductService from './noteProduct.service.js';
 
 export interface CreateNoteData {
   userId: number;
@@ -95,6 +96,7 @@ export async function update(id: number, data: UpdateNoteData) {
 }
 
 export async function remove(id: number) {
+  await noteProductService.deleteByNoteId(id);
   return prisma.note.delete({
     where: { id },
   });

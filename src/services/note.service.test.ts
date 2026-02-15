@@ -14,6 +14,11 @@ vi.mock('../lib/db.js', () => ({
   },
   userSelect: { id: true, email: true, name: true, firstLastName: true },
 }));
+vi.mock('./noteProduct.service.js', () => ({
+  deleteByNoteId: vi.fn(),
+}));
+
+import * as noteProductService from './noteProduct.service.js';
 
 describe('NoteService', () => {
   beforeEach(() => {
@@ -119,11 +124,13 @@ describe('NoteService', () => {
   });
 
   describe('remove', () => {
-    it('deletes note by id', async () => {
+    it('deletes note products first then note by id', async () => {
+      vi.mocked(noteProductService.deleteByNoteId).mockResolvedValue(undefined);
       vi.mocked(prisma.note.delete).mockResolvedValue({ id: 1 });
 
       await noteService.remove(1);
 
+      expect(noteProductService.deleteByNoteId).toHaveBeenCalledWith(1);
       expect(prisma.note.delete).toHaveBeenCalledWith({ where: { id: 1 } });
     });
   });

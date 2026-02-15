@@ -2,8 +2,14 @@ import type { Request, Response } from 'express';
 import { parseId } from '../lib/db.js';
 import * as productService from '../services/product.service.js';
 
-export async function getAll(_req: Request, res: Response) {
-  const products = await productService.findAll();
+export async function getAll(req: Request, res: Response) {
+  const categoryIdParam = req.query.categoryId;
+  let categoryId: number | undefined;
+  if (categoryIdParam !== undefined && categoryIdParam !== '') {
+    const n = Number(categoryIdParam);
+    if (!Number.isNaN(n)) categoryId = n;
+  }
+  const products = await productService.findAll(categoryId);
   res.json(products);
 }
 
