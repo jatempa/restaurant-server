@@ -16,7 +16,7 @@ export interface UpdateProductData {
 
 export async function findAll(categoryId?: number) {
   return prisma.product.findMany({
-    where: categoryId ? { categoryId } : undefined,
+    ...(categoryId != null && { where: { categoryId } }),
     include: { category: true },
     orderBy: { id: 'asc' },
   });
@@ -57,5 +57,18 @@ export async function update(id: number, data: UpdateProductData) {
 export async function remove(id: number) {
   return prisma.product.delete({
     where: { id },
+  });
+}
+
+export async function reduceStock(productId: number, amount: number) {
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+  });
+  if (!product) return null;
+  const newStock = Math.max(0, product.stock - amount);
+  return prisma.product.update({
+    where: { id: productId },
+    data: { stock: newStock },
+    include: { category: true },
   });
 }

@@ -1,5 +1,6 @@
 import { prisma, userSelect } from '../lib/db.js';
 import * as noteProductService from './noteProduct.service.js';
+import * as productService from './product.service.js';
 
 export interface CreateNoteData {
   userId: number;
@@ -102,7 +103,29 @@ export async function remove(id: number) {
   });
 }
 
+export async function reduceStockForNote(noteId: number) {
+  const note = await prisma.note.findUnique({
+    where: { id: noteId },
+    include: { noteProducts: true },
+  });
+  if (!note) return;
+  const byProduct: Record<number, number> = {};
+  for (const np of note.noteProducts) {
+    byProduct[np.productId] = (byProduct[np.productId] ?? 0) + np.amount;
+  }
+  for (const [productId, amount] of Object.entries(byProduct)) {
+    await productService.reduceStock(Number(productId), amount);
+  }
+}
+
 export async function closeAllByAccountId(accountId: number, checkoutDate: Date) {
+  const notesToClose = await prisma.note.findMany({
+    where: { accountId, checkout: null },
+    select: { id: true },
+  });
+  for (const note of notesToClose) {
+    await reduceStockForNote(note.id);
+  }
   return prisma.note.updateMany({
     where: { accountId, checkout: null },
     data: { checkout: checkoutDate, status: 'closed' },

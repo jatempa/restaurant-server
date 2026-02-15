@@ -27,7 +27,6 @@ describe('ProductService', () => {
       const result = await productService.findAll();
 
       expect(prisma.product.findMany).toHaveBeenCalledWith({
-        where: undefined,
         include: { category: true },
         orderBy: { id: 'asc' },
       });
@@ -110,6 +109,53 @@ describe('ProductService', () => {
         include: { category: true },
       });
       expect(result).toEqual(mockUpdated);
+    });
+  });
+
+  describe('reduceStock', () => {
+    it('reduces product stock by amount', async () => {
+      const mockProduct = { id: 1, name: 'Cola', price: 25, stock: 100, categoryId: 1, category: { id: 1 } };
+      vi.mocked(prisma.product.findUnique).mockResolvedValue(mockProduct);
+      vi.mocked(prisma.product.update).mockResolvedValue({
+        ...mockProduct,
+        stock: 95,
+      });
+
+      const result = await productService.reduceStock(1, 5);
+
+      expect(prisma.product.findUnique).toHaveBeenCalledWith({ where: { id: 1 } });
+      expect(prisma.product.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { stock: 95 },
+        include: { category: true },
+      });
+      expect(result?.stock).toBe(95);
+    });
+
+    it('does not go below zero', async () => {
+      const mockProduct = { id: 1, name: 'Cola', price: 25, stock: 3, categoryId: 1, category: { id: 1 } };
+      vi.mocked(prisma.product.findUnique).mockResolvedValue(mockProduct);
+      vi.mocked(prisma.product.update).mockResolvedValue({
+        ...mockProduct,
+        stock: 0,
+      });
+
+      await productService.reduceStock(1, 10);
+
+      expect(prisma.product.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { stock: 0 },
+        include: { category: true },
+      });
+    });
+
+    it('returns null when product not found', async () => {
+      vi.mocked(prisma.product.findUnique).mockResolvedValue(null);
+
+      const result = await productService.reduceStock(999, 5);
+
+      expect(result).toBeNull();
+      expect(prisma.product.update).not.toHaveBeenCalled();
     });
   });
 

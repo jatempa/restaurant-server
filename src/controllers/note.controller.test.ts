@@ -14,6 +14,7 @@ vi.mock('../services/note.service.js', () => ({
   create: vi.fn(),
   update: vi.fn(),
   remove: vi.fn(),
+  reduceStockForNote: vi.fn(),
 }));
 
 import { parseId } from '../lib/db.js';
