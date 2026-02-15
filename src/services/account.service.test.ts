@@ -22,7 +22,7 @@ describe('AccountService', () => {
 
   describe('findAll', () => {
     it('returns all accounts with user', async () => {
-      const mockAccounts = [{ id: 1, name: 'Mesa 1', user: { id: 1, name: 'Test' } }];
+      const mockAccounts = [{ id: 1, userId: 1, name: 'Mesa 1', checkin: null, checkout: null, user: { id: 1, name: 'Test' } }];
       vi.mocked(prisma.account.findMany).mockResolvedValue(mockAccounts);
 
       const result = await accountService.findAll();
@@ -35,9 +35,25 @@ describe('AccountService', () => {
     });
   });
 
+  describe('findByUserId', () => {
+    it('returns accounts for user', async () => {
+      const mockAccounts = [{ id: 1, userId: 1, name: 'Mesa 1', checkin: null, checkout: null, user: { id: 1 } }];
+      vi.mocked(prisma.account.findMany).mockResolvedValue(mockAccounts);
+
+      const result = await accountService.findByUserId(1);
+
+      expect(prisma.account.findMany).toHaveBeenCalledWith({
+        where: { userId: 1 },
+        include: { user: { select: expect.any(Object) } },
+        orderBy: { id: 'asc' },
+      });
+      expect(result).toEqual(mockAccounts);
+    });
+  });
+
   describe('findById', () => {
     it('returns account when found', async () => {
-      const mockAccount = { id: 1, name: 'Mesa 1', user: { id: 1 }, notes: [] };
+      const mockAccount = { id: 1, userId: 1, name: 'Mesa 1', checkin: null, checkout: null, user: { id: 1 }, notes: [] };
       vi.mocked(prisma.account.findUnique).mockResolvedValue(mockAccount);
 
       const result = await accountService.findById(1);
@@ -60,7 +76,7 @@ describe('AccountService', () => {
 
   describe('create', () => {
     it('creates account with required and optional fields', async () => {
-      const mockCreated = { id: 1, userId: 1, name: 'Mesa 1', user: { id: 1 } };
+      const mockCreated = { id: 1, userId: 1, name: 'Mesa 1', checkin: new Date('2026-02-14T12:00:00'), checkout: null, user: { id: 1 } };
       vi.mocked(prisma.account.create).mockResolvedValue(mockCreated);
 
       const result = await accountService.create({
@@ -82,7 +98,7 @@ describe('AccountService', () => {
     });
 
     it('creates account with only required userId', async () => {
-      vi.mocked(prisma.account.create).mockResolvedValue({ id: 1, userId: 1 });
+      vi.mocked(prisma.account.create).mockResolvedValue({ id: 1, userId: 1, name: null, checkin: null, checkout: null });
 
       await accountService.create({ userId: 1 });
 
@@ -95,7 +111,7 @@ describe('AccountService', () => {
 
   describe('update', () => {
     it('updates account with provided fields', async () => {
-      const mockUpdated = { id: 1, name: 'Mesa 2', user: { id: 1 }, notes: [] };
+      const mockUpdated = { id: 1, userId: 1, name: 'Mesa 2', checkin: null, checkout: null, user: { id: 1 }, notes: [] };
       vi.mocked(prisma.account.update).mockResolvedValue(mockUpdated);
 
       const result = await accountService.update(1, { name: 'Mesa 2' });
@@ -109,7 +125,7 @@ describe('AccountService', () => {
     });
 
     it('clears optional fields when passed null', async () => {
-      vi.mocked(prisma.account.update).mockResolvedValue({ id: 1 });
+      vi.mocked(prisma.account.update).mockResolvedValue({ id: 1, userId: 1, name: null, checkin: null, checkout: null });
 
       await accountService.update(1, { checkout: null });
 
@@ -123,7 +139,7 @@ describe('AccountService', () => {
 
   describe('remove', () => {
     it('deletes account by id', async () => {
-      vi.mocked(prisma.account.delete).mockResolvedValue({ id: 1 });
+      vi.mocked(prisma.account.delete).mockResolvedValue({ id: 1, userId: 1, name: null, checkin: null, checkout: null });
 
       await accountService.remove(1);
 

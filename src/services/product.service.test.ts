@@ -21,12 +21,27 @@ describe('ProductService', () => {
 
   describe('findAll', () => {
     it('returns all products with category', async () => {
-      const mockProducts = [{ id: 1, name: 'Coca Cola', price: 25.5, category: { id: 1 } }];
+      const mockProducts = [{ id: 1, name: 'Coca Cola', price: 25.5, stock: 100, categoryId: 1, category: { id: 1 } }];
       vi.mocked(prisma.product.findMany).mockResolvedValue(mockProducts);
 
       const result = await productService.findAll();
 
       expect(prisma.product.findMany).toHaveBeenCalledWith({
+        where: undefined,
+        include: { category: true },
+        orderBy: { id: 'asc' },
+      });
+      expect(result).toEqual(mockProducts);
+    });
+
+    it('filters by categoryId when provided', async () => {
+      const mockProducts = [{ id: 1, name: 'Cola', price: 25, stock: 100, categoryId: 1, category: { id: 1 } }];
+      vi.mocked(prisma.product.findMany).mockResolvedValue(mockProducts);
+
+      const result = await productService.findAll(1);
+
+      expect(prisma.product.findMany).toHaveBeenCalledWith({
+        where: { categoryId: 1 },
         include: { category: true },
         orderBy: { id: 'asc' },
       });
@@ -36,7 +51,7 @@ describe('ProductService', () => {
 
   describe('findById', () => {
     it('returns product when found', async () => {
-      const mockProduct = { id: 1, name: 'Coca Cola', price: 25.5, category: { id: 1 } };
+      const mockProduct = { id: 1, name: 'Coca Cola', price: 25.5, stock: 100, categoryId: 1, category: { id: 1 } };
       vi.mocked(prisma.product.findUnique).mockResolvedValue(mockProduct);
 
       const result = await productService.findById(1);
@@ -84,7 +99,7 @@ describe('ProductService', () => {
 
   describe('update', () => {
     it('updates product with partial data', async () => {
-      const mockUpdated = { id: 1, name: 'Pepsi', price: 25.5, stock: 80 };
+      const mockUpdated = { id: 1, name: 'Pepsi', price: 25.5, stock: 80, categoryId: 1 };
       vi.mocked(prisma.product.update).mockResolvedValue(mockUpdated);
 
       const result = await productService.update(1, { name: 'Pepsi', stock: 80 });
@@ -100,7 +115,7 @@ describe('ProductService', () => {
 
   describe('remove', () => {
     it('deletes product by id', async () => {
-      vi.mocked(prisma.product.delete).mockResolvedValue({ id: 1 });
+      vi.mocked(prisma.product.delete).mockResolvedValue({ id: 1, name: 'Cola', price: 25, stock: 100, categoryId: 1 });
 
       await productService.remove(1);
 

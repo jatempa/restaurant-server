@@ -34,8 +34,18 @@ describe('ProductController', () => {
       vi.mocked(productService.findAll).mockResolvedValue(mockProducts);
       const res = createMockResponse();
       await productController.getAll(createMockRequest(), res);
+      expect(productService.findAll).toHaveBeenCalledWith(undefined);
       expect(res.statusCode).toBe(200);
       expect((res as { _jsonData?: unknown })._jsonData).toEqual(mockProducts);
+    });
+
+    it('filters by categoryId when query param provided', async () => {
+      const mockProducts = [{ id: 1, name: 'Cola', price: 25, stock: 100, categoryId: 1, category: { id: 1 } }];
+      vi.mocked(productService.findAll).mockResolvedValue(mockProducts);
+      const res = createMockResponse();
+      await productController.getAll(createMockRequest({ query: { categoryId: '1' } }), res);
+      expect(productService.findAll).toHaveBeenCalledWith(1);
+      expect(res.statusCode).toBe(200);
     });
   });
 

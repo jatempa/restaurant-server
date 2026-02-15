@@ -24,6 +24,7 @@ import * as noteService from '../services/note.service.js';
 
 describe('AccountController', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(parseId).mockReturnValue(null);
   });
 
@@ -231,6 +232,51 @@ describe('AccountController', () => {
       expect(res.statusCode).toBe(200);
     });
 
+    it('returns 404 when account belongs to another user', async () => {
+      const mockFindById = {
+        id: 1,
+        userId: 2,
+        name: 'Mesa 1',
+        checkin: null,
+        checkout: null,
+        user: { id: 2, name: 'Other', email: 'other@example.com', firstLastName: 'User' },
+        notes: [],
+      };
+      vi.mocked(parseId).mockReturnValue(1);
+      vi.mocked(accountService.findById).mockResolvedValue(mockFindById);
+
+      const req = createMockRequest({ params: { id: '1' }, body: { name: 'Mesa 2' }, user: { sub: 1, email: 'user@example.com' } });
+      const res = createMockResponse();
+
+      await accountController.update(req, res);
+
+      expect(res.statusCode).toBe(404);
+      expect(accountService.update).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when account is closed', async () => {
+      const mockFindById = {
+        id: 1,
+        userId: 1,
+        name: 'Mesa 1',
+        checkin: null,
+        checkout: new Date('2026-02-14T18:00:00'),
+        user: { id: 1, name: 'User', email: 'user@example.com', firstLastName: 'User' },
+        notes: [],
+      };
+      vi.mocked(parseId).mockReturnValue(1);
+      vi.mocked(accountService.findById).mockResolvedValue(mockFindById);
+
+      const req = createMockRequest({ params: { id: '1' }, body: { name: 'Mesa 2' }, user: { sub: 1, email: 'user@example.com' } });
+      const res = createMockResponse();
+
+      await accountController.update(req, res);
+
+      expect(res.statusCode).toBe(404);
+      expect((res as { _jsonData?: unknown })._jsonData).toEqual({ message: 'Account is closed' });
+      expect(accountService.update).not.toHaveBeenCalled();
+    });
+
     it('closes all notes when account is checked out', async () => {
       const mockFindById = {
         id: 1,
@@ -287,6 +333,28 @@ describe('AccountController', () => {
       await accountController.remove(req, res);
 
       expect(res.statusCode).toBe(404);
+    });
+
+    it('returns 404 when account belongs to another user', async () => {
+      const mockFindById = {
+        id: 1,
+        userId: 2,
+        name: 'Mesa 1',
+        checkin: null,
+        checkout: null,
+        user: { id: 2, name: 'Other', email: 'other@example.com', firstLastName: 'User' },
+        notes: [],
+      };
+      vi.mocked(parseId).mockReturnValue(1);
+      vi.mocked(accountService.findById).mockResolvedValue(mockFindById);
+
+      const req = createMockRequest({ params: { id: '1' }, user: { sub: 1, email: 'user@example.com' } });
+      const res = createMockResponse();
+
+      await accountController.remove(req, res);
+
+      expect(res.statusCode).toBe(404);
+      expect(accountService.remove).not.toHaveBeenCalled();
     });
 
     it('deletes account and returns 204', async () => {

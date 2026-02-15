@@ -20,13 +20,16 @@ import { parseId } from '../lib/db.js';
 import * as accountService from '../services/account.service.js';
 import * as noteService from '../services/note.service.js';
 
+const mockUser = { id: 1, name: 'User', email: 'user@example.com', firstLastName: 'User' };
+const mockAccountBase = { id: 1, userId: 1, name: 'Mesa 1', checkin: null, checkout: null };
+
 describe('NoteController', () => {
   beforeEach(() => {
     vi.mocked(parseId).mockReturnValue(null);
   });
 
   describe('getAll', () => {
-    it('returns all notes', async () => {
+    it('returns all notes when no accountId', async () => {
       const mockNotes = [
         {
           id: 1,
@@ -44,6 +47,66 @@ describe('NoteController', () => {
       vi.mocked(noteService.findAll).mockResolvedValue(mockNotes);
       const res = createMockResponse();
       await noteController.getAll(createMockRequest(), res);
+      expect(noteService.findAll).toHaveBeenCalled();
+      expect(res.statusCode).toBe(200);
+      expect((res as { _jsonData?: unknown })._jsonData).toEqual(mockNotes);
+    });
+
+    it('returns 401 when accountId provided but unauthenticated', async () => {
+      const res = createMockResponse();
+      await noteController.getAll(createMockRequest({ query: { accountId: '1' } }), res);
+      expect(res.statusCode).toBe(401);
+      expect(noteService.findByAccountId).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 for invalid accountId', async () => {
+      const res = createMockResponse();
+      await noteController.getAll(
+        createMockRequest({ query: { accountId: 'x' }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('returns 404 when account not found for accountId filter', async () => {
+      vi.mocked(accountService.findById).mockResolvedValue(null);
+      const res = createMockResponse();
+      await noteController.getAll(
+        createMockRequest({ query: { accountId: '1' }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
+      expect(res.statusCode).toBe(404);
+    });
+
+    it('returns 404 when account belongs to another user for accountId filter', async () => {
+      vi.mocked(accountService.findById).mockResolvedValue({
+        id: 1,
+        userId: 999,
+        name: 'Mesa 1',
+        checkin: null,
+        checkout: null,
+        user: { id: 999, name: 'Other', email: 'other@x.com', firstLastName: 'Other' },
+        notes: [],
+      });
+      const res = createMockResponse();
+      await noteController.getAll(
+        createMockRequest({ query: { accountId: '1' }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
+      expect(res.statusCode).toBe(404);
+    });
+
+    it('returns notes for account when accountId valid and belongs to user', async () => {
+      const mockAccount = { ...mockAccountBase, user: mockUser, notes: [] };
+      const mockNotes = [{ id: 1, userId: 1, accountId: 1, numberNote: 1, status: 'open', checkin: null, checkout: null, user: mockUser, account: mockAccount, noteProducts: [] }];
+      vi.mocked(accountService.findById).mockResolvedValue(mockAccount);
+      vi.mocked(noteService.findByAccountId).mockResolvedValue(mockNotes);
+      const res = createMockResponse();
+      await noteController.getAll(
+        createMockRequest({ query: { accountId: '1' }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
+      expect(noteService.findByAccountId).toHaveBeenCalledWith(1);
       expect(res.statusCode).toBe(200);
       expect((res as { _jsonData?: unknown })._jsonData).toEqual(mockNotes);
     });
@@ -75,6 +138,55 @@ describe('NoteController', () => {
       );
       expect(res.statusCode).toBe(404);
     });
+
+    it('returns 404 when account does not belong to user', async () => {
+      const mockNote = { 
+        id: 1, 
+        accountId: 1, 
+        userId: 1, 
+        numberNote: 1, 
+        status: 'open', 
+        checkin: null,
+        checkout: null,
+        user: mockUser, 
+        account: mockAccountBase, 
+        noteProducts: [] 
+      };
+      vi.mocked(parseId).mockReturnValue(1);
+      vi.mocked(noteService.findById).mockResolvedValue(mockNote);
+      vi.mocked(accountService.findById).mockResolvedValue({ id: 1, userId: 999, name: 'Mesa', checkin: null, checkout: null, user: mockUser, notes: [] });
+      const res = createMockResponse();
+      await noteController.getById(
+        createMockRequest({ params: { id: '1' }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
+      expect(res.statusCode).toBe(404);
+    });
+
+    it('returns note when found and belongs to user', async () => {
+      const mockNote = {
+        id: 1,
+        accountId: 1,
+        userId: 1,
+        numberNote: 1001,
+        status: 'open',
+        checkin: null,
+        checkout: null,
+        user: { id: 1, name: 'User', email: 'user@example.com', firstLastName: 'User' },
+        account: { id: 1, userId: 1, name: 'Mesa 1', checkin: null, checkout: null },
+        noteProducts: [],
+      };
+      vi.mocked(parseId).mockReturnValue(1);
+      vi.mocked(noteService.findById).mockResolvedValue(mockNote);
+      vi.mocked(accountService.findById).mockResolvedValue({ id: 1, userId: 1, name: 'Mesa', checkin: null, checkout: null, user: mockUser, notes: [] });
+      const res = createMockResponse();
+      await noteController.getById(
+        createMockRequest({ params: { id: '1' }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
+      expect(res.statusCode).toBe(200);
+      expect((res as { _jsonData?: unknown })._jsonData).toEqual(mockNote);
+    });
   });
 
   describe('create', () => {
@@ -94,6 +206,56 @@ describe('NoteController', () => {
         res
       );
       expect(res.statusCode).toBe(400);
+    });
+
+    it('returns 404 when account not found', async () => {
+      vi.mocked(accountService.findById).mockResolvedValue(null);
+      const res = createMockResponse();
+      await noteController.create(
+        createMockRequest({ body: { accountId: 1 }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
+      expect(res.statusCode).toBe(404);
+      expect(noteService.create).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when account belongs to another user', async () => {
+      vi.mocked(accountService.findById).mockResolvedValue({
+        id: 1,
+        userId: 999,
+        name: 'Mesa 1',
+        checkin: null,
+        checkout: null,
+        user: { id: 999, name: 'Other', email: 'other@x.com', firstLastName: 'Other' },
+        notes: [],
+      });
+      const res = createMockResponse();
+      await noteController.create(
+        createMockRequest({ body: { accountId: 1 }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
+      expect(res.statusCode).toBe(404);
+      expect(noteService.create).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when account is closed', async () => {
+      vi.mocked(accountService.findById).mockResolvedValue({
+        id: 1,
+        userId: 1,
+        name: 'Mesa 1',
+        checkin: null,
+        checkout: new Date('2026-02-14T18:00:00'),
+        user: mockUser,
+        notes: [],
+      });
+      const res = createMockResponse();
+      await noteController.create(
+        createMockRequest({ body: { accountId: 1 }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
+      expect(res.statusCode).toBe(404);
+      expect((res as { _jsonData?: unknown })._jsonData).toEqual({ message: 'Account is closed' });
+      expect(noteService.create).not.toHaveBeenCalled();
     });
 
     it('creates note and returns 201', async () => {
@@ -165,6 +327,107 @@ describe('NoteController', () => {
       );
       expect(res.statusCode).toBe(404);
     });
+
+    it('returns 404 when account does not belong to user', async () => {
+      const mockNote = { id: 1, accountId: 1, userId: 1, numberNote: 1, status: 'open', checkin: null, checkout: null, user: mockUser, account: mockAccountBase, noteProducts: [] };
+      vi.mocked(parseId).mockReturnValue(1);
+      vi.mocked(noteService.findById).mockResolvedValue(mockNote);
+      vi.mocked(accountService.findById).mockResolvedValue({ id: 1, userId: 999, name: 'Mesa', checkin: null, checkout: null, user: mockUser, notes: [] });
+      const res = createMockResponse();
+      await noteController.update(
+        createMockRequest({ params: { id: '1' }, body: { status: 'completed' }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
+      expect(res.statusCode).toBe(404);
+      expect(noteService.update).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when note is closed', async () => {
+      const mockNote = {
+        id: 1,
+        accountId: 1,
+        userId: 1,
+        numberNote: 1,
+        status: 'open',
+        checkin: null,
+        checkout: new Date('2026-02-14T18:00:00'),
+        user: mockUser,
+        account: { id: 1, userId: 1, name: 'Mesa 1', checkin: null, checkout: null },
+        noteProducts: [],
+      };
+      vi.mocked(parseId).mockReturnValue(1);
+      vi.mocked(noteService.findById).mockResolvedValue(mockNote);
+      vi.mocked(accountService.findById).mockResolvedValue({ id: 1, userId: 1, name: 'Mesa', checkin: null, checkout: null, user: mockUser, notes: [] });
+      const res = createMockResponse();
+      await noteController.update(
+        createMockRequest({ params: { id: '1' }, body: { status: 'completed' }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
+      expect(res.statusCode).toBe(404);
+      expect((res as { _jsonData?: unknown })._jsonData).toEqual({ message: 'Note is closed' });
+      expect(noteService.update).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when account is closed', async () => {
+      const mockNote = {
+        id: 1,
+        accountId: 1,
+        userId: 1,
+        numberNote: 1,
+        status: 'open',
+        checkin: null,
+        checkout: null,
+        user: mockUser,
+        account: { id: 1, userId: 1, name: 'Mesa 1', checkin: null, checkout: new Date('2026-02-14T18:00:00') },
+        noteProducts: [],
+      };
+      vi.mocked(parseId).mockReturnValue(1);
+      vi.mocked(noteService.findById).mockResolvedValue(mockNote);
+      vi.mocked(accountService.findById).mockResolvedValue({
+        id: 1,
+        userId: 1,
+        name: 'Mesa',
+        checkin: null,
+        checkout: new Date('2026-02-14T18:00:00'),
+        user: mockUser,
+        notes: [],
+      });
+      const res = createMockResponse();
+      await noteController.update(
+        createMockRequest({ params: { id: '1' }, body: { status: 'completed' }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
+      expect(res.statusCode).toBe(404);
+      expect((res as { _jsonData?: unknown })._jsonData).toEqual({ message: 'Note is closed' });
+      expect(noteService.update).not.toHaveBeenCalled();
+    });
+
+    it('updates note and returns 200', async () => {
+      const mockNote = {
+        id: 1,
+        accountId: 1,
+        userId: 1,
+        numberNote: 1,
+        status: 'open',
+        checkin: null,
+        checkout: null,
+        user: mockUser,
+        account: { id: 1, userId: 1, name: 'Mesa 1', checkin: null, checkout: null },
+        noteProducts: [],
+      };
+      const mockUpdated = { ...mockNote, status: 'completed' };
+      vi.mocked(parseId).mockReturnValue(1);
+      vi.mocked(noteService.findById).mockResolvedValue(mockNote);
+      vi.mocked(accountService.findById).mockResolvedValue({ id: 1, userId: 1, name: 'Mesa', checkin: null, checkout: null, user: mockUser, notes: [] });
+      vi.mocked(noteService.update).mockResolvedValue(mockUpdated);
+      const res = createMockResponse();
+      await noteController.update(
+        createMockRequest({ params: { id: '1' }, body: { status: 'completed' }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
+      expect(noteService.update).toHaveBeenCalledWith(1, expect.objectContaining({ status: 'completed' }));
+      expect(res.statusCode).toBe(200);
+    });
   });
 
   describe('remove', () => {
@@ -186,6 +449,43 @@ describe('NoteController', () => {
       const res = createMockResponse();
       await noteController.remove(createMockRequest({ params: { id: '1' } }), res);
       expect(res.statusCode).toBe(401);
+    });
+
+    it('returns 404 when note not found', async () => {
+      vi.mocked(parseId).mockReturnValue(1);
+      vi.mocked(noteService.findById).mockResolvedValue(null);
+      const res = createMockResponse();
+      await noteController.remove(
+        createMockRequest({ params: { id: '1' }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
+      expect(res.statusCode).toBe(404);
+      expect(noteService.remove).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when account does not belong to user', async () => {
+      const mockNote = {
+        id: 1,
+        accountId: 1,
+        userId: 1,
+        numberNote: 1,
+        status: 'open',
+        checkin: null,
+        checkout: null,
+        user: mockUser,
+        account: mockAccountBase,
+        noteProducts: [],
+      };
+      vi.mocked(parseId).mockReturnValue(1);
+      vi.mocked(noteService.findById).mockResolvedValue(mockNote);
+      vi.mocked(accountService.findById).mockResolvedValue({ id: 1, userId: 999, name: 'Mesa', checkin: null, checkout: null, user: mockUser, notes: [] });
+      const res = createMockResponse();
+      await noteController.remove(
+        createMockRequest({ params: { id: '1' }, user: { sub: 1, email: 'u@x.com' } }),
+        res
+      );
+      expect(res.statusCode).toBe(404);
+      expect(noteService.remove).not.toHaveBeenCalled();
     });
 
     it('deletes and returns 204', async () => {
