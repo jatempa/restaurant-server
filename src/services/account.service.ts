@@ -20,6 +20,14 @@ export async function findAll() {
   });
 }
 
+export async function findByUserId(userId: number) {
+  return prisma.account.findMany({
+    where: { userId },
+    include: { user: { select: userSelect } },
+    orderBy: { id: 'asc' },
+  });
+}
+
 export async function findById(id: number) {
   return prisma.account.findUnique({
     where: { id },
