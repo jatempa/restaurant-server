@@ -13,6 +13,12 @@ vi.mock('../services/product.service.js', () => ({
   findById: vi.fn(),
 }));
 vi.mock('../services/noteProduct.service.js', () => ({
+  InsufficientStockError: class InsufficientStockError extends Error {
+    constructor() {
+      super('Insufficient stock');
+      this.name = 'InsufficientStockError';
+    }
+  },
   create: vi.fn(),
   updateByNoteAndProduct: vi.fn(),
   deleteByNoteAndProduct: vi.fn(),
@@ -212,6 +218,31 @@ describe('NoteProductController', () => {
       expect(res.statusCode).toBe(201);
       expect((res as { _jsonData?: unknown })._jsonData).toEqual(mockNoteProduct);
     });
+
+    it('returns 400 when there is insufficient stock', async () => {
+      vi.mocked(parseId).mockReturnValue(1);
+      vi.mocked(noteService.findById).mockResolvedValue(mockNote);
+      vi.mocked(accountService.findById).mockResolvedValue(mockAccount);
+      vi.mocked(productService.findById).mockResolvedValue(mockProduct);
+      vi.mocked(noteProductService.create).mockRejectedValue(
+        new noteProductService.InsufficientStockError()
+      );
+      const res = createMockResponse();
+
+      await noteProductController.addProduct(
+        createMockRequest({
+          params: { noteId: '1' },
+          body: { productId: 2, amount: 999 },
+          user: { sub: 1, email: 'u@x.com' },
+        }),
+        res
+      );
+
+      expect(res.statusCode).toBe(400);
+      expect((res as { _jsonData?: unknown })._jsonData).toEqual({
+        message: 'Insufficient stock',
+      });
+    });
   });
 
   describe('updateProduct', () => {
@@ -288,6 +319,30 @@ describe('NoteProductController', () => {
       expect((res as { _jsonData?: unknown })._jsonData).toEqual(
         updatedNoteProduct
       );
+    });
+
+    it('returns 400 when update amount exceeds stock', async () => {
+      mockParseId();
+      vi.mocked(noteService.findById).mockResolvedValue(mockNote);
+      vi.mocked(accountService.findById).mockResolvedValue(mockAccount);
+      vi.mocked(noteProductService.updateByNoteAndProduct).mockRejectedValue(
+        new noteProductService.InsufficientStockError()
+      );
+      const res = createMockResponse();
+
+      await noteProductController.updateProduct(
+        createMockRequest({
+          params: { noteId: '1', productId: '2' },
+          body: { amount: 999 },
+          user: { sub: 1, email: 'u@x.com' },
+        }),
+        res
+      );
+
+      expect(res.statusCode).toBe(400);
+      expect((res as { _jsonData?: unknown })._jsonData).toEqual({
+        message: 'Insufficient stock',
+      });
     });
   });
 

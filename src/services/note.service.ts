@@ -119,13 +119,6 @@ export async function reduceStockForNote(noteId: number) {
 }
 
 export async function closeAllByAccountId(accountId: number, checkoutDate: Date) {
-  const notesToClose = await prisma.note.findMany({
-    where: { accountId, checkout: null },
-    select: { id: true },
-  });
-  for (const note of notesToClose) {
-    await reduceStockForNote(note.id);
-  }
   return prisma.note.updateMany({
     where: { accountId, checkout: null },
     data: { checkout: checkoutDate, status: 'closed' },

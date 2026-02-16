@@ -206,39 +206,17 @@ describe('NoteService', () => {
   });
 
   describe('closeAllByAccountId', () => {
-    it('reduces stock for each note then closes all open notes for account', async () => {
+    it('closes all open notes for account', async () => {
       const checkoutDate = new Date('2026-02-14T18:00:00');
-      vi.mocked(prisma.note.findMany).mockResolvedValue([
-        { id: 1 },
-        { id: 2 },
-      ] as never);
-      vi.mocked(prisma.note.findUnique)
-        .mockResolvedValueOnce({
-          id: 1,
-          noteProducts: [
-            { productId: 10, amount: 2 },
-            { productId: 20, amount: 1 },
-          ],
-        } as never)
-        .mockResolvedValueOnce({
-          id: 2,
-          noteProducts: [{ productId: 10, amount: 1 }],
-        } as never);
       vi.mocked(prisma.note.updateMany).mockResolvedValue({ count: 2 });
 
       await noteService.closeAllByAccountId(1, checkoutDate);
 
-      expect(prisma.note.findMany).toHaveBeenCalledWith({
-        where: { accountId: 1, checkout: null },
-        select: { id: true },
-      });
       expect(prisma.note.updateMany).toHaveBeenCalledWith({
         where: { accountId: 1, checkout: null },
         data: { checkout: checkoutDate, status: 'closed' },
       });
-      expect(productService.reduceStock).toHaveBeenCalledWith(10, 2);
-      expect(productService.reduceStock).toHaveBeenCalledWith(20, 1);
-      expect(productService.reduceStock).toHaveBeenCalledWith(10, 1);
+      expect(productService.reduceStock).not.toHaveBeenCalled();
     });
   });
 });

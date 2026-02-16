@@ -4,6 +4,7 @@ import * as accountService from '../services/account.service.js';
 import * as noteService from '../services/note.service.js';
 import * as productService from '../services/product.service.js';
 import * as noteProductService from '../services/noteProduct.service.js';
+import { InsufficientStockError } from '../services/noteProduct.service.js';
 
 export async function addProduct(req: Request, res: Response) {
   const userId = req.user?.sub;
@@ -41,13 +42,21 @@ export async function addProduct(req: Request, res: Response) {
     return;
   }
   const total = product.price * Number(amount);
-  const noteProduct = await noteProductService.create({
-    noteId,
-    productId: product.id,
-    amount: Number(amount),
-    total,
-  });
-  res.status(201).json(noteProduct);
+  try {
+    const noteProduct = await noteProductService.create({
+      noteId,
+      productId: product.id,
+      amount: Number(amount),
+      total,
+    });
+    res.status(201).json(noteProduct);
+  } catch (error) {
+    if (error instanceof InsufficientStockError) {
+      res.status(400).json({ message: 'Insufficient stock' });
+      return;
+    }
+    throw error;
+  }
 }
 
 async function verifyNoteOwnership(userId: number, noteId: number) {
@@ -80,16 +89,24 @@ export async function updateProduct(req: Request, res: Response) {
     res.status(400).json({ message: 'amount must be at least 1' });
     return;
   }
-  const updated = await noteProductService.updateByNoteAndProduct(
-    noteId,
-    productId,
-    Number(amount)
-  );
-  if (!updated) {
-    res.status(404).json({ message: 'Product not found' });
-    return;
+  try {
+    const updated = await noteProductService.updateByNoteAndProduct(
+      noteId,
+      productId,
+      Number(amount)
+    );
+    if (!updated) {
+      res.status(404).json({ message: 'Product not found' });
+      return;
+    }
+    res.json(updated);
+  } catch (error) {
+    if (error instanceof InsufficientStockError) {
+      res.status(400).json({ message: 'Insufficient stock' });
+      return;
+    }
+    throw error;
   }
-  res.json(updated);
 }
 
 export async function removeProduct(req: Request, res: Response) {

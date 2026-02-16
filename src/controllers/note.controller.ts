@@ -112,9 +112,6 @@ export async function update(req: Request, res: Response) {
     return;
   }
   const { userId: _userId, accountId, numberNote, status, checkin, checkout } = req.body;
-  if (checkout !== undefined && checkout !== null) {
-    await noteService.reduceStockForNote(id);
-  }
   const note = await noteService.update(id, {
     ...(_userId !== undefined && { userId: Number(_userId) }),
     ...(accountId !== undefined && { accountId: Number(accountId) }),
