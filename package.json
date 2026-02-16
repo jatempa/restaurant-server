@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "nodemon --exec tsx src/index.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:seed": "tsx prisma/seed.ts"
   },
   "type": "module",
   "keywords": [],
